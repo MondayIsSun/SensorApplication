@@ -46,12 +46,10 @@ public class OrientationSensorController implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_ORIENTATION) {//方向传感器
-
             int rotationAngle = (int) event.values[1];
             if (rotationAngle > -12 && rotationAngle < 12) {//pad为水平位置，重置mIsFirstInRange
                 mIsFirstInRange = true;
             }
-
             if ((rotationAngle < -mFloorLevel && rotationAngle > -UPPER_LIMIT) || (rotationAngle < UPPER_LIMIT && rotationAngle > mFloorLevel)) {
                 if (mIsFirstInRange) {//第一次进入该范围，需要发送消息
                     String rotation_type;
@@ -60,7 +58,11 @@ public class OrientationSensorController implements SensorEventListener {
                     } else {
                         rotation_type = ROTATION_TYPE_POSITIVE;
                     }
-                    getMessage(rotation_type);
+                    //内部push给h5 , rotation_type : POSITIVE , NEGATIVE
+                    sendMessage(rotation_type);
+                    String eventData = "{\"rotation_type\":\"" + rotation_type + "\"}";
+                    Log.d("ELSeed", "eventData = " + eventData);
+                    //NativeH5Utils.nativeSendMessageToH5(SensorConstants.ORIENTATION_SENSOR_EVENT_NAME, eventData);
                     mIsFirstInRange = false;
                 }
             }
@@ -70,19 +72,12 @@ public class OrientationSensorController implements SensorEventListener {
     }
 
     @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+    public void onAccuracyChanged(Sensor sensor, int i) {
 
     }
 
-    /**
-     * 发送重置算盘状态消息
-     *
-     * @param r_type 旋转的类型
-     * @return 返回旋转的类型
-     */
-    public String getMessage(String r_type) {
-        Log.d("ELSeed", "getMessage()! " + r_type);
-        return r_type;
+    private void sendMessage(String rotation_type) {
+        Log.d("ELSeed", "sendMessage()! " + rotation_type);
     }
 
     /**
@@ -91,13 +86,27 @@ public class OrientationSensorController implements SensorEventListener {
      * @param floorLevel 范围:[15,60],越小越灵敏
      */
     public void setFloorLevel(int floorLevel) {
-        this.mFloorLevel = floorLevel;
+        if (floorLevel >= 15 && floorLevel <= 60) {
+            this.mFloorLevel = floorLevel;
+        } else {
+            Log.d("ELSeed", "floorLevel is out of range ! ");
+        }
     }
 
     /**
      * 激活方向传感器
      */
-    public void openOrientationSensor() {
+    public void openOrientationSensor(int floorLevel) {
+        Log.d("ELSeed", "openOrientationSensor! ");
+        if (-1 != floorLevel) {
+            if (floorLevel >= 15 && floorLevel <= 60) {
+                this.mFloorLevel = floorLevel;
+            } else {
+                Log.d("ELSeed", "floorLevel is out of range ! ");
+            }
+        } else {
+            Log.d("ELSeed", "floorLevel is null ! ");
+        }
         mSensorManager = (SensorManager) mContext.getSystemService(Context.SENSOR_SERVICE);
         mOrientationSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
         mSensorManager.registerListener(mInstance, mOrientationSensor, SensorManager.SENSOR_DELAY_NORMAL);
@@ -107,6 +116,12 @@ public class OrientationSensorController implements SensorEventListener {
      * 注销方向传感器
      */
     public void closeOrientationSensor() {
-        mSensorManager.unregisterListener(mInstance);
+        if (null != mSensorManager) {
+            if (null != mInstance) {
+                Log.d("ELSeed", "closeOrientationSensor! ");
+                mSensorManager.unregisterListener(mInstance);
+                mInstance = null;
+            }
+        }
     }
 }
